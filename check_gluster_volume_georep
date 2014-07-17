@@ -1,0 +1,113 @@
+#!/bin/bash
+
+PATH=/sbin:/bin:/usr/sbin:/usr/bin
+
+PROGNAME=$(basename -- $0)
+PROGPATH=`echo $0 | sed -e 's,[\\/][^\\/][^\\/]*$,,'`
+REVISION="1.0.0"
+
+. $PROGPATH/utils.sh
+
+# parse command line
+usage () {
+  echo ""
+  echo "USAGE: "
+  echo "  $PROGNAME -v VOLUME -h SLAVEHOST -s SLAVEVOL"
+  #echo "     -f : files or deletes pending"
+  #echo "     -z : files skipped"
+  echo "     -d : show debug output"
+  exit $STATE_UNKNOWN
+}
+
+while getopts "v:h:s:d" opt; do
+  case $opt in
+    v) VOLUME=${OPTARG} ;;
+    h) SLAVEHOST=${OPTARG} ;;
+    s) SLAVEVOL=${OPTARG} ;;
+    d) DEBUG=true ;;
+    *) usage ;;
+  esac
+done
+
+if [ -z "${VOLUME}" -o -z "${SLAVEHOST}" -o -z "${SLAVEVOL}"  ]; then
+  usage
+fi
+
+Exit () {
+	$ECHO "$1: ${2:0}"
+	status=STATE_$1
+	exit ${!status}
+}
+
+IFS=$'\n'; geo_rep_sessions=( $(sudo gluster volume geo-replication ${VOLUME} ${SLAVEHOST}::${SLAVEVOL} status detail | grep ${VOLUME}) )
+
+## Note: Fields are:
+# 1: MASTER NODE
+# 2: MASTER VOL
+# 3: MASTER BRICK
+# 4: SLAVE NODE and VOL
+# 5: STATUS
+# 6: CHECKPOINT STATUS
+# 7: CRAWL STATUS
+# 8: FILES SYNCD
+# 9: FILES PENDING
+# 10: BYTES PENDING
+# 11: DELETES PENDING
+# 12: FILES SKIPPED
+
+active_sessions=0
+passive_sessions=0
+notstarted_sessions=0
+faulty_sessions=0
+initializing_sessions=0
+stopped_sessions=0
+
+for gsession in ${!geo_rep_sessions[@]}; do
+  if [[ "$DEBUG" == true ]]; then
+    echo "gsession = ${gsession}  elements = ${geo_rep_sessions[gsession]}"
+    echo
+  fi
+  session_state=$(echo "${geo_rep_sessions[gsession]}" | awk '{print $5}' | tr '[:upper:]' '[:lower:]'| tr -d '.')
+  [[ ${geo_rep_sessions[gsession]} == *No\ active\ geo-replication\ sessions* ]] && errors=("${errors[@]}" "${gep_repo_entries[gsession]}" )
+  [[ "$session_state" == "active" ]] && active_sessions=$((active_sessions+1)) && crawl_status=$(echo "${geo_rep_sessions[gsession]}" | awk '{print $7}' | tr '[:upper:]' '[:lower:]'| tr -d '.') 
+  [[ "$session_state" == "passive" ]] && passive_sessions=$((passive_sessions+1))
+  [[ "$session_state" == "not\ started" ]] && notstarted_sessions=$((notstarted_sessions+1))
+  [[ "$session_state" == "faulty" ]] && faulty_sessions=$((faulty_sessions+1))
+  [[ "$session_state" == "initializing" ]] && initializing_sessions=$((initializing_sessions+1))
+  [[ "$session_state" == "stopped" ]] && stopped_sessions=$((stopped_sessions+1))
+done
+
+if [[ "$DEBUG" == true ]]; then
+  echo
+  echo "active_sessions = $active_sessions"
+  echo "passive_sessions = $passive_sessions"
+  echo "notstarted_sessions = $notstarted_sessions"
+  echo "faulty_sessions = $faulty_sessions"
+  echo "initializing_sessions = $initializing_sessions"
+  echo "stopped_sessions = $stopped_sessions"
+fi
+
+[[ $active_sessions < 1 ]] && errors=("${errors[@]}" "No active geo-rep sessions." ) && ex_stat="CRITICAL_stat"
+[[ $active_sessions > 1 ]] && errors=("${errors[@]}" "Multiple \(${active_sessions}\) active geo-rep sessions." ) && ex_stat="CRITICAL_stat"
+[[ $passive_sessions < 1 ]] && errors=("${errors[@]}" "No passive standby geo-rep sessions." ) 
+[[ $passive_sessions > 1 ]] && errors=("${errors[@]}" "Multiple \(${passive_sessions}\) passive standby geo-rep sessions." )
+[[ $notstarted_sessions > 0 ]] && errors=("${errors[@]}" "One or more geo-rep sessions not started." ) && ex_stat="CRITICAL_stat"
+[[ $faulty_sessions > 0 ]] && errors=("${errors[@]}" "${faulty_sessions} faulty geo-rep sessions." ) && ex_stat="CRITICAL_stat"
+[[ $initializing_sessions > 0 ]] && errors=("${errors[@]}" "${initializing_sessions} geo-rep sessions currently initializing." )
+[[ $stopped_sessions > 0 ]] && errors=("${errors[@]}" "${stopped_sessions} geo-rep sessions are stopped." ) && ex_stat="CRITICAL_stat"
+
+# exit with errors
+if [ -n "$errors" ]; then
+	sep='; '
+	msg=$(printf "${sep}%s" "${errors[@]}")
+	msg=${msg:${#sep}}
+  if [ ${ex_stat} == "CRITICAL_stat" ]; then
+	  Exit CRITICAL "${msg}"
+	else
+	  Exit WARNING "${msg}"
+  fi
+fi
+
+# exit with no errors
+Exit OK "${active_sessions} active geo-rep session, crawl status ${crawl_status}; ${passive_sessions} passive geo-rep session."
+
