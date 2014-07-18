@@ -39,7 +39,7 @@ Exit () {
 	exit ${!status}
 }
 
-IFS=$'\n'; geo_rep_sessions=( $(sudo gluster volume geo-replication ${VOLUME} ${SLAVEHOST}::${SLAVEVOL} status detail | grep ${VOLUME}) )
+IFS=$'\n'; geo_rep_sessions=( $(sudo gluster volume geo-replication ${VOLUME} ${SLAVEHOST}::${SLAVEVOL} status detail 2>&1 | grep ${VOLUME}) )
 
 ## Note: Fields are:
 # 1: MASTER NODE
@@ -66,28 +66,43 @@ ex_stat=""
 
 for gsession in ${!geo_rep_sessions[@]}; do
   if [[ "$DEBUG" == true ]]; then
-    echo "gsession = ${gsession}  elements = ${geo_rep_sessions[gsession]}"
-    echo
+    echo; echo
+    echo "line # of output=${gsession}"
+    echo "   contents of output = \"${geo_rep_sessions[gsession]}\""
   fi
-  session_state=$(echo "${geo_rep_sessions[gsession]}" | awk '{print $5}' | tr '[:upper:]' '[:lower:]'| tr -d '.')
-  [[ ${geo_rep_sessions[gsession]} == *No\ active\ geo-replication\ sessions* ]] && errors=("${errors[@]}" "${gep_repo_entries[gsession]}" )
-  [[ "$session_state" == "active" ]] && active_sessions=$((active_sessions+1)) && crawl_status=$(echo "${geo_rep_sessions[gsession]}" | awk '{print $7}' | tr '[:upper:]' '[:lower:]'| tr -d '.') 
-  [[ "$session_state" == "passive" ]] && passive_sessions=$((passive_sessions+1))
-  [[ "$session_state" == "not\ started" ]] && notstarted_sessions=$((notstarted_sessions+1))
-  [[ "$session_state" == "faulty" ]] && faulty_sessions=$((faulty_sessions+1))
-  [[ "$session_state" == "initializing" ]] && initializing_sessions=$((initializing_sessions+1))
-  [[ "$session_state" == "stopped" ]] && stopped_sessions=$((stopped_sessions+1))
-done
 
-if [[ "$DEBUG" == true ]]; then
-  echo
-  echo "active_sessions = $active_sessions"
-  echo "passive_sessions = $passive_sessions"
-  echo "notstarted_sessions = $notstarted_sessions"
-  echo "faulty_sessions = $faulty_sessions"
-  echo "initializing_sessions = $initializing_sessions"
-  echo "stopped_sessions = $stopped_sessions"
-fi
+  if [[ "${geo_rep_sessions[gsession]}" == *"Volume ${VOLUME} does not exist"* ]]; then
+   msg="${geo_rep_sessions[gsession]}"
+   ex_stat="CRITICAL_stat"
+   Exit CRITICAL "${msg}"
+  fi
+
+  if [[ "${geo_rep_sessions[gsession]}" == *"No active geo-replication sessions"* ]]; then
+   msg="${geo_rep_sessions[gsession]}"
+   ex_stat="CRITICAL_stat"
+   Exit CRITICAL "${msg}"
+  fi
+
+  if [[ "${ex_stat}" != "CRITICAL_stat" ]]; then
+    session_state=$(echo "${geo_rep_sessions[gsession]}" | awk '{print $5}' | tr '[:upper:]' '[:lower:]'| tr -d '.')
+    [[ "$session_state" == "active" ]] && active_sessions=$((active_sessions+1)) && crawl_status=$(echo "${geo_rep_sessions[gsession]}" | awk '{print $7}' | tr '[:upper:]' '[:lower:]'| tr -d '.') 
+    [[ "$session_state" == "passive" ]] && passive_sessions=$((passive_sessions+1))
+    [[ "$session_state" == "not\ started" ]] && notstarted_sessions=$((notstarted_sessions+1))
+    [[ "$session_state" == "faulty" ]] && faulty_sessions=$((faulty_sessions+1))
+    [[ "$session_state" == "initializing" ]] && initializing_sessions=$((initializing_sessions+1))
+    [[ "$session_state" == "stopped" ]] && stopped_sessions=$((stopped_sessions+1))
+  fi
+
+  if [[ "$DEBUG" == true ]]; then
+    echo
+    echo "active_sessions = $active_sessions"
+    echo "passive_sessions = $passive_sessions"
+    echo "notstarted_sessions = $notstarted_sessions"
+    echo "faulty_sessions = $faulty_sessions"
+    echo "initializing_sessions = $initializing_sessions"
+    echo "stopped_sessions = $stopped_sessions"
+  fi
+done
 
 [[ $active_sessions < 1 ]] && errors=("${errors[@]}" "No active geo-rep sessions." )
 [[ $active_sessions > 1 ]] && errors=("${errors[@]}" "Multiple \(${active_sessions}\) active geo-rep sessions." )
@@ -112,4 +127,3 @@ fi
 
 # exit with no errors
 Exit OK "${active_sessions} active geo-rep session, crawl status ${crawl_status}; ${passive_sessions} passive geo-rep session."
-
