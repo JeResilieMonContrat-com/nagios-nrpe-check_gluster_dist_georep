@@ -62,6 +62,8 @@ faulty_sessions=0
 initializing_sessions=0
 stopped_sessions=0
 
+ex_stat=""
+
 for gsession in ${!geo_rep_sessions[@]}; do
   if [[ "$DEBUG" == true ]]; then
     echo "gsession = ${gsession}  elements = ${geo_rep_sessions[gsession]}"
@@ -87,13 +89,13 @@ if [[ "$DEBUG" == true ]]; then
   echo "stopped_sessions = $stopped_sessions"
 fi
 
-[[ $active_sessions < 1 ]] && errors=("${errors[@]}" "No active geo-rep sessions." ) && ex_stat="CRITICAL_stat"
-[[ $active_sessions > 1 ]] && errors=("${errors[@]}" "Multiple \(${active_sessions}\) active geo-rep sessions." ) && ex_stat="CRITICAL_stat"
+[[ $active_sessions < 1 ]] && errors=("${errors[@]}" "No active geo-rep sessions." )
+[[ $active_sessions > 1 ]] && errors=("${errors[@]}" "Multiple \(${active_sessions}\) active geo-rep sessions." )
 [[ $passive_sessions < 1 ]] && errors=("${errors[@]}" "No passive standby geo-rep sessions." ) 
 [[ $passive_sessions > 1 ]] && errors=("${errors[@]}" "Multiple \(${passive_sessions}\) passive standby geo-rep sessions." )
-[[ $notstarted_sessions > 0 ]] && errors=("${errors[@]}" "One or more geo-rep sessions not started." ) && ex_stat="CRITICAL_stat"
-[[ $faulty_sessions > 0 ]] && errors=("${errors[@]}" "${faulty_sessions} faulty geo-rep sessions." ) && ex_stat="CRITICAL_stat"
 [[ $initializing_sessions > 0 ]] && errors=("${errors[@]}" "${initializing_sessions} geo-rep sessions currently initializing." )
+[[ $notstarted_sessions > 0 ]] && errors=("${errors[@]}" "${notstarted_sessions} geo-rep sessions not started." ) && ex_stat="CRITICAL_stat"
+[[ $faulty_sessions > 0 ]] && errors=("${errors[@]}" "${faulty_sessions} faulty geo-rep sessions." ) && ex_stat="CRITICAL_stat"
 [[ $stopped_sessions > 0 ]] && errors=("${errors[@]}" "${stopped_sessions} geo-rep sessions are stopped." ) && ex_stat="CRITICAL_stat"
 
 # exit with errors
@@ -101,7 +103,7 @@ if [ -n "$errors" ]; then
 	sep='; '
 	msg=$(printf "${sep}%s" "${errors[@]}")
 	msg=${msg:${#sep}}
-  if [ ${ex_stat} == "CRITICAL_stat" ]; then
+  if [ "${ex_stat}" == "CRITICAL_stat" ]; then
 	  Exit CRITICAL "${msg}"
 	else
 	  Exit WARNING "${msg}"
