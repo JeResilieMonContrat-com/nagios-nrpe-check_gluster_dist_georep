@@ -104,6 +104,7 @@ for gsession in ${!geo_rep_sessions[@]}; do
   fi
 done
 
+[[ $crawl_status  == "hybrid" ]] && errors=("${errors[@]}" "Crawl status has fallen back to hybrid." )
 [[ $active_sessions < 1 ]] && errors=("${errors[@]}" "No active geo-rep sessions." )
 [[ $active_sessions > 1 ]] && errors=("${errors[@]}" "Multiple \(${active_sessions}\) active geo-rep sessions." )
 [[ $passive_sessions < 1 ]] && errors=("${errors[@]}" "No passive standby geo-rep sessions." ) 
