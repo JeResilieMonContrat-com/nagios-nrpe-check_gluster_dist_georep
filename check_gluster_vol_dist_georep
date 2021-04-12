@@ -45,15 +45,11 @@ IFS=$'\n'; geo_rep_sessions=( $(sudo gluster volume geo-replication ${VOLUME} ${
 # 1: MASTER NODE
 # 2: MASTER VOL
 # 3: MASTER BRICK
-# 4: SLAVE NODE and VOL
-# 5: STATUS
-# 6: CHECKPOINT STATUS
-# 7: CRAWL STATUS
-# 8: FILES SYNCD
-# 9: FILES PENDING
-# 10: BYTES PENDING
-# 11: DELETES PENDING
-# 12: FILES SKIPPED
+# 4: SLAVE USER
+# 5: SLAVE NODE and VOL
+# 6: SLAVE NODE
+# 7: STATUS
+# 8: CRAWL STATUS
 
 active_sessions=0
 passive_sessions=0
@@ -84,8 +80,8 @@ for gsession in ${!geo_rep_sessions[@]}; do
   fi
 
   if [[ "${ex_stat}" != "CRITICAL_stat" ]]; then
-    session_state=$(echo "${geo_rep_sessions[gsession]}" | awk '{print $5}' | tr '[:upper:]' '[:lower:]'| tr -d '.')
-    [[ "$session_state" == "active" ]] && active_sessions=$((active_sessions+1)) && crawl_status=$(echo "${geo_rep_sessions[gsession]}" | awk '{print $7}' | tr '[:upper:]' '[:lower:]'| tr -d '.') 
+    session_state=$(echo "${geo_rep_sessions[gsession]}" | awk '{print $7}' | tr '[:upper:]' '[:lower:]'| tr -d '.')
+    [[ "$session_state" == "active" ]] && active_sessions=$((active_sessions+1)) && crawl_status=$(echo "${geo_rep_sessions[gsession]}" | awk '{print $8}' | tr '[:upper:]' '[:lower:]'| tr -d '.')
     [[ "$session_state" == "passive" ]] && passive_sessions=$((passive_sessions+1))
     [[ "$session_state" == "not\ started" ]] && notstarted_sessions=$((notstarted_sessions+1))
     [[ "$session_state" == "faulty" ]] && faulty_sessions=$((faulty_sessions+1))
