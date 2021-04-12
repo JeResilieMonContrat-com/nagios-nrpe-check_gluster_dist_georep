@@ -104,7 +104,6 @@ done
 [[ $active_sessions < 1 ]] && errors=("${errors[@]}" "No active geo-rep sessions." )
 [[ $active_sessions > 1 ]] && errors=("${errors[@]}" "Multiple \(${active_sessions}\) active geo-rep sessions." )
 [[ $passive_sessions < 1 ]] && errors=("${errors[@]}" "No passive standby geo-rep sessions." ) 
-[[ $passive_sessions > 1 ]] && errors=("${errors[@]}" "Multiple \(${passive_sessions}\) passive standby geo-rep sessions." )
 [[ $initializing_sessions > 0 ]] && errors=("${errors[@]}" "${initializing_sessions} geo-rep sessions currently initializing." )
 [[ $notstarted_sessions > 0 ]] && errors=("${errors[@]}" "${notstarted_sessions} geo-rep sessions not started." ) && ex_stat="CRITICAL_stat"
 [[ $faulty_sessions > 0 ]] && errors=("${errors[@]}" "${faulty_sessions} faulty geo-rep sessions." ) && ex_stat="CRITICAL_stat"
